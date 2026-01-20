@@ -1,145 +1,105 @@
-/**
+﻿/**
  * generator.js
- * JavaScript Code Generation from Custom Blocks
- * 
- * Converts visual blocks into executable JavaScript code
+ * JavaScript Code Generation for Custom Blocks
+ *
+ * Registers generators on `Blockly.JavaScript['block_type']` so they integrate
+ * with `Blockly.JavaScript.init`, `workspaceToCode`, and `finish`.
  */
 
-console.log('🔄 Loading code generator...');
+console.log('🔄 Loading Blockly JavaScript generators...');
 
-// ================================
-// Initialize JavaScript Code Generator
-// ================================
+if (typeof Blockly === 'undefined' || !Blockly.JavaScript) {
+    console.error('❌ Blockly or Blockly.JavaScript is not available. Generators not registered.');
+} else {
+    const jsGen = Blockly.JavaScript;
 
-// Use the correct Blockly generator reference
-const javascriptGenerator = Blockly.JavaScript || Blockly.javascript;
+    // Helper: safely escape strings for code
+    function escapeString(str) {
+        return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/\"/g, '\\"')
+            .replace(/\n/g, '\\n');
+    }
 
-// ================================
-// 1. START WORKFLOW Generator
-// ================================
+    // START WORKFLOW (statement)
+    jsGen['start_workflow'] = function(block) {
+        const stmts = jsGen.statementToCode(block, 'DO') || '';
+        const body = stmts ? stmts : '    // empty workflow\n';
 
-javascriptGenerator.forBlock['start_workflow'] = function(block) {
-    const statements_do = javascriptGenerator.statementToCode(block, 'DO');
-    
-    const code = `
-// ===== WORKFLOW START =====
-(function() {
-    const __variables = {};
-    const __output = [];
-    const __console = {
-        log: function(...args) {
-            __output.push(args.join(' '));
-        }
+        const code = `// ===== WORKFLOW START =====\n(function() {\n    const __variables = {};\n    const __output = [];\n    const __console = {\n        log: function(...args) { __output.push(args.join(' ')); }\n    };\n\n${body}\n    return __output.join('\\n');\n})();\n`;
+        return code || '';  // Ensure return is never undefined
     };
 
-${statements_do || '    // Empty workflow'}
+    // SET VARIABLE (statement)
+    jsGen['set_variable'] = function(block) {
+        const varName = block.getFieldValue('VAR_NAME') || 'variable';
+        const value = jsGen.valueToCode(block, 'VALUE', jsGen.ORDER_ATOMIC) || '0';
+        const code = `__variables['${varName}'] = ${value};\n__console.log('✓ Variable "${varName}" set to:', __variables['${varName}']);\n`;
+        return code || '';  // Ensure return is never undefined
+    };
 
-    return __output.join('\\n');
-})();
-`;
-    
-    return code;
-};
+    // ADD NUMBERS (value)
+    jsGen['add_numbers'] = function(block) {
+        const a = jsGen.valueToCode(block, 'NUM1', jsGen.ORDER_ADDITION) || '0';
+        const b = jsGen.valueToCode(block, 'NUM2', jsGen.ORDER_ADDITION) || '0';
+        const code = `(${a} + ${b})`;
+        return [code || '0', jsGen.ORDER_ADDITION];  // Ensure return[0] is never undefined
+    };
 
-// ================================
-// 2. SET VARIABLE Generator
-// ================================
+    // MULTIPLY NUMBERS (value)
+    jsGen['multiply_numbers'] = function(block) {
+        const a = jsGen.valueToCode(block, 'NUM1', jsGen.ORDER_MULTIPLICATION) || '0';
+        const b = jsGen.valueToCode(block, 'NUM2', jsGen.ORDER_MULTIPLICATION) || '0';
+        const code = `(${a} * ${b})`;
+        return [code || '0', jsGen.ORDER_MULTIPLICATION];  // Ensure return[0] is never undefined
+    };
 
-javascriptGenerator.forBlock['set_variable'] = function(block) {
-    const var_name = block.getField('VAR_NAME').getValue();
-    const value_code = javascriptGenerator.valueToCode(block, 'VALUE', javascriptGenerator.ORDER_ATOMIC);
-    
-    let code = `    __variables['${var_name}'] = ${value_code};\n`;
-    code += `    __console.log('✓ Variable "${var_name}" set to:', __variables['${var_name}']);\n`;
-    
-    return code;
-};
+    // IF CONDITION (statement)
+    jsGen['if_condition'] = function(block) {
+        const left = jsGen.valueToCode(block, 'CONDITION_LEFT', jsGen.ORDER_ATOMIC) || '0';
+        const right = jsGen.valueToCode(block, 'CONDITION_RIGHT', jsGen.ORDER_ATOMIC) || '0';
+        const operator = block.getFieldValue('OPERATOR') || 'GREATER';
+        let op = '>';
+        if (operator === 'LESS') op = '<';
+        if (operator === 'EQUAL') op = '===';
 
-// ================================
-// 3. ADD NUMBERS Generator
-// ================================
+        const branchTrue = jsGen.statementToCode(block, 'DO_TRUE') || '';
+        const branchFalse = jsGen.statementToCode(block, 'DO_FALSE') || '';
 
-javascriptGenerator.forBlock['add_numbers'] = function(block) {
-    const num1_code = javascriptGenerator.valueToCode(block, 'NUM1', javascriptGenerator.ORDER_ADDITIVE);
-    const num2_code = javascriptGenerator.valueToCode(block, 'NUM2', javascriptGenerator.ORDER_ADDITIVE);
-    
-    const code = `(${num1_code} + ${num2_code})`;
-    
-    return [code, javascriptGenerator.ORDER_ADDITIVE];
-};
+        let code = `if (${left} ${op} ${right}) {\n`;
+        code += branchTrue ? branchTrue : '    // empty\n';
+        code += `} else {\n`;
+        code += branchFalse ? branchFalse : '    // empty\n';
+        code += `}\n`;
+        return code || '';  // Ensure return is never undefined
+    };
 
-// ================================
-// 4. MULTIPLY NUMBERS Generator
-// ================================
+    // PRINT OUTPUT (statement)
+    jsGen['print_output'] = function(block) {
+        const text = jsGen.valueToCode(block, 'TEXT', jsGen.ORDER_ATOMIC) || '""';
+        return `__console.log(${text});\n` || '';  // Ensure return is never undefined
+    };
 
-javascriptGenerator.forBlock['multiply_numbers'] = function(block) {
-    const num1_code = javascriptGenerator.valueToCode(block, 'NUM1', javascriptGenerator.ORDER_MULTIPLICATIVE);
-    const num2_code = javascriptGenerator.valueToCode(block, 'NUM2', javascriptGenerator.ORDER_MULTIPLICATIVE);
-    
-    const code = `(${num1_code} * ${num2_code})`;
-    
-    return [code, javascriptGenerator.ORDER_MULTIPLICATIVE];
-};
+    // MATH NUMBER (value)
+    jsGen['math_number'] = function(block) {
+        const num = block.getFieldValue('NUM') || '0';
+        const code = Number(num) || 0;
+        return [String(code) || '0', jsGen.ORDER_ATOMIC];  // Ensure return[0] is never undefined
+    };
 
-// ================================
-// 5. IF CONDITION Generator
-// ================================
+    // TEXT BLOCK (value)
+    jsGen['text_block'] = function(block) {
+        const txt = block.getFieldValue('TEXT') || '';
+        const code = '"' + escapeString(txt) + '"';
+        return [code || '""', jsGen.ORDER_ATOMIC];  // Ensure return[0] is never undefined
+    };
 
-javascriptGenerator.forBlock['if_condition'] = function(block) {
-    const condition_left = javascriptGenerator.valueToCode(block, 'CONDITION_LEFT', javascriptGenerator.ORDER_RELATIONAL);
-    const condition_right = javascriptGenerator.valueToCode(block, 'CONDITION_RIGHT', javascriptGenerator.ORDER_RELATIONAL);
-    const operator_value = block.getFieldValue('OPERATOR');
-    
-    let operator_symbol = '>';
-    if (operator_value === 'LESS') operator_symbol = '<';
-    if (operator_value === 'EQUAL') operator_symbol = '===';
-    
-    const statements_true = javascriptGenerator.statementToCode(block, 'DO_TRUE');
-    const statements_false = javascriptGenerator.statementToCode(block, 'DO_FALSE');
-    
-    let code = `    if (${condition_left} ${operator_symbol} ${condition_right}) {\n`;
-    code += statements_true || '        // empty block\n';
-    code += `    } else {\n`;
-    code += statements_false || '        // empty block\n';
-    code += `    }\n`;
-    
-    return code;
-};
+    // GET VARIABLE (value)
+    jsGen['variables_get'] = function(block) {
+        const name = block.getFieldValue('VAR') || 'item';
+        const code = `__variables['${name}']`;
+        return [code || '__variables["item"]', jsGen.ORDER_ATOMIC];  // Ensure return[0] is never undefined
+    };
 
-// ================================
-// 6. PRINT OUTPUT Generator
-// ================================
-
-javascriptGenerator.forBlock['print_output'] = function(block) {
-    const text_code = javascriptGenerator.valueToCode(block, 'TEXT', javascriptGenerator.ORDER_ATOMIC);
-    
-    const code = `    __console.log(${text_code});\n`;
-    
-    return code;
-};
-
-// ================================
-// Additional Blocks Generators
-// ================================
-
-// Number generator
-javascriptGenerator.forBlock['math_number'] = function(block) {
-    const num = parseFloat(block.getField('NUM').getValue());
-    return [String(num), javascriptGenerator.ORDER_ATOMIC];
-};
-
-// Text generator
-javascriptGenerator.forBlock['text_block'] = function(block) {
-    const text = block.getField('TEXT').getValue();
-    const code = `"${text.replace(/"/g, '\\"')}"`;
-    return [code, javascriptGenerator.ORDER_ATOMIC];
-};
-
-// Variables get generator
-javascriptGenerator.forBlock['variables_get'] = function(block) {
-    const var_name = block.getField('VAR').getValue();
-    const code = `__variables['${var_name}']`;
-    return [code, javascriptGenerator.ORDER_ATOMIC];
-};
-
-console.log("✅ Code generator loaded successfully!");
+    console.log('✅ Blockly.JavaScript generators registered');
+}

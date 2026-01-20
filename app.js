@@ -16,12 +16,19 @@
 
 let workspace = null;
 let generatedCode = '';
+let appInitialized = false;  // Guard to prevent double initialization
 
 // ================================
 // Initialize Application
 // ================================
 
 function initializeApp() {
+    // Guard: prevent double initialization
+    if (appInitialized) {
+        console.warn('⚠️  App already initialized, skipping...');
+        return;
+    }
+
     console.log('Starting app initialization...');
     
     // Check if Blockly is loaded
@@ -47,7 +54,7 @@ function initializeApp() {
     try {
         workspace = Blockly.inject(blocklyDiv, {
             toolbox: toolboxElement,
-            media: 'https://cdn.jsdelivr.net/npm/blockly@11.3.2/media/',
+            media: 'https://cdn.jsdelivr.net/npm/blockly@10.2.0/media/',
             grid: {
                 spacing: 25,
                 length: 3,
@@ -72,11 +79,23 @@ function initializeApp() {
         return;
     }
 
+    // Initialize the Blockly JavaScript generator for this workspace immediately
+    try {
+        if (Blockly && (Blockly.JavaScript || Blockly.javascript)) {
+            const jsGen = Blockly.JavaScript || Blockly.javascript;
+            try { jsGen.init && jsGen.init(workspace); } catch (e) { console.warn('Generator init warning:', e); }
+            try { jsGen.finish && jsGen.finish(); } catch (e) { /* finish may expect args; ignore here */ }
+            console.log('✅ Blockly.JavaScript generator initialized');
+        }
+    } catch (e) {
+        console.warn('Could not initialize Blockly.JavaScript generator now:', e);
+    }
+
     // Event Listeners
     setupEventListeners();
     
-    // Load demo blocks if workspace is empty
-    loadDemoWorkflow();
+    // Mark initialization as complete
+    appInitialized = true;
     
     console.log('✅ Application initialized successfully!');
 }
@@ -92,12 +111,8 @@ function setupEventListeners() {
     document.getElementById('clearConsoleBtn').addEventListener('click', clearConsole);
     document.getElementById('copyCodeBtn').addEventListener('click', copyCode);
     
-    // Auto-generate code when workspace changes
-    workspace.addChangeListener(debounce(() => {
-        if (workspace.getTopBlocks().length > 0) {
-            generateCode();
-        }
-    }, 500));
+    // Note: Auto-generate disabled to prevent initialization errors
+    // Code generation now only happens on button click
 }
 
 // ================================
@@ -123,17 +138,39 @@ function generateCode() {
             return;
         }
         
-        // Generate code from START block
-        const startBlock = topBlocks.find(block => block.type === 'start_workflow');
-        
-        // Get the correct generator
-        const generator = Blockly.JavaScript || Blockly.javascript;
-        if (!generator) {
-            logConsole('❌ Error: JavaScript generator not available', 'error');
+        // Ensure Blockly's JavaScript generator is initialized for this workspace
+        if (!Blockly || !Blockly.JavaScript) {
+            logConsole('❌ Error: Blockly JavaScript generator not available', 'error');
             return;
         }
-        
-        generatedCode = generator.blockToCode(startBlock);
+
+        try {
+            Blockly.JavaScript.init(workspace);
+        } catch (e) {
+            // Some Blockly builds may throw if init expects different args - ignore and continue
+            console.warn('Blockly.JavaScript.init() warning:', e && e.message ? e.message : e);
+        }
+
+        // Generate code from the whole workspace (start block will be included)
+        let code = '';
+        try {
+            code = Blockly.JavaScript.workspaceToCode(workspace);
+        } catch (e) {
+            logConsole('❌ Error while converting workspace to code: ' + (e.message || e), 'error');
+            console.error(e);
+            return;
+        }
+
+        // Finalize generator (adds definitions, imports, etc.)
+        try {
+            if (typeof Blockly.JavaScript.finish === 'function') {
+                code = Blockly.JavaScript.finish(code);
+            }
+        } catch (e) {
+            console.warn('Blockly.JavaScript.finish() warning:', e && e.message ? e.message : e);
+        }
+
+        generatedCode = code;
         
         // Format code
         generatedCode = formatCode(generatedCode);
@@ -159,7 +196,21 @@ function runCode() {
             logConsole('⚠️ No code to run. Generate code first!', 'warning');
             return;
         }
-        
+
+        // Ensure Blockly JavaScript generator is initialized before running
+        try {
+            if (Blockly && Blockly.JavaScript) {
+                try { Blockly.JavaScript.init(workspace); } catch (e) { console.warn('Blockly.JavaScript.init() warning:', e && e.message ? e.message : e); }
+                try {
+                    if (typeof Blockly.JavaScript.finish === 'function') {
+                        generatedCode = Blockly.JavaScript.finish(generatedCode);
+                    }
+                } catch (e) { console.warn('Blockly.JavaScript.finish() warning:', e && e.message ? e.message : e); }
+            }
+        } catch (e) {
+            console.warn('Generator availability check failed:', e);
+        }
+
         clearConsole();
         logConsole('⏳ Running code...', 'info');
         
@@ -318,7 +369,7 @@ function clearConsole() {
 function clearWorkspace() {
     const confirmed = confirm('Are you sure you want to clear the entire workspace?');
     
-    if (confirmed) {
+    if (confirmed && workspace) {
         workspace.clear();
         generatedCode = '';
         displayCode('// Workspace cleared');
@@ -373,7 +424,7 @@ function loadDemoWorkflow() {
                                 <next>
                                     <block type="print_output">
                                         <value name="TEXT">
-                                            <block type="text">
+                                            <block type="text_block">
                                                 <field name="TEXT">Result:</field>
                                             </block>
                                         </value>
@@ -387,16 +438,8 @@ function loadDemoWorkflow() {
         </xml>
     `;
     
-    // Load demo only if workspace is empty
-    if (workspace.getTopBlocks().length === 0) {
-        try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(demoXml, 'text/xml');
-            Blockly.Xml.domToWorkspace(xmlDoc.firstElementChild, workspace);
-        } catch (error) {
-            console.warn('Could not load demo workflow:', error);
-        }
-    }
+    // Demo loading disabled to prevent initialization errors
+    // Users can build their own blocks instead
 }
 
 // ================================
