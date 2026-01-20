@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockly Workflow Builder - Custom Blocks Demo</title>
+    
+    <!-- Blockly CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/blockly@10.2.0/blockly_compressed.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blockly@10.2.0/blocks_compressed.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blockly@10.2.0/en.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blockly@10.2.0/javascript_compressed.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🔗 Blockly Workflow Builder</h1>
+                <p>Create, generate, and execute custom workflows using visual blocks</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel: Blockly Workspace (70%) -->
+            <div class="workspace-panel">
+                <div class="panel-header">
+                    <h2>Workspace</h2>
+                </div>
+                <div id="blocklyDiv" class="blockly-container"></div>
+                <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox">
+                    <!-- Workflow Blocks Category -->
+                    <category name="Workflow" colour="25">
+                        <block type="start_workflow"></block>
+                        <block type="set_variable"></block>
+                        <block type="variables_get"></block>
+                        <block type="print_output"></block>
+                    </category>
+
+                    <!-- Math Blocks Category -->
+                    <category name="Math" colour="30">
+                        <block type="math_number"></block>
+                        <block type="add_numbers"></block>
+                        <block type="multiply_numbers"></block>
+                    </category>
+
+                    <!-- Logic Blocks Category -->
+                    <category name="Logic" colour="120">
+                        <block type="if_condition"></block>
+                    </category>
+
+                    <!-- Text Category -->
+                    <category name="Text" colour="160">
+                        <block type="text_block"></block>
+                    </category>
+                </xml>
+            </div>
+
+            <!-- Right Panel: Code & Output (30%) -->
+            <div class="code-panel">
+                <!-- Generated Code Section -->
+                <div class="code-section">
+                    <div class="section-header">
+                        <h2>Generated JavaScript</h2>
+                        <button id="copyCodeBtn" class="btn btn-small" title="Copy code to clipboard">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <pre id="codeOutput" class="code-output"><code>// Your generated code will appear here</code></pre>
+                </div>
+
+                <!-- Output Console Section -->
+                <div class="output-section">
+                    <div class="section-header">
+                        <h2>Console Output</h2>
+                        <button id="clearConsoleBtn" class="btn btn-small" title="Clear console">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                    <div id="consoleOutput" class="console-output">
+                        <p class="console-info">Ready. Build blocks and click "Run Code"</p>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="controls">
+                    <button id="generateCodeBtn" class="btn btn-primary">
+                        ⚙️ Generate Code
+                    </button>
+                    <button id="runCodeBtn" class="btn btn-success">
+                        ▶️ Run Code
+                    </button>
+                    <button id="clearWorkspaceBtn" class="btn btn-danger">
+                        🔄 Clear Workspace
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts (load in order: blocks first, then generator, then app) -->
+    <script src="blocks.js"></script>
+    <script src="generator.js"></script>
+    <script src="app.js"></script>
+    
+    <!-- Initialize app after DOM is ready -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM ready, initializing app...');
+            if (typeof initializeApp === 'function') {
+                initializeApp();
+            } else {
+                console.error('initializeApp function not found');
+            }
+        });
+    </script>
+</body>
+</html>
